@@ -14,7 +14,7 @@ def starts_with_vowel_sound(word, pronunciations=cmudict.dict()):
 
 
         
-f = open("calibration_facts.json")
+f = open("silver_facts.json")
 data = json.load(f)
 
 possibilities = []
@@ -37,8 +37,8 @@ connector = {"IsA": [" is ", " is not "],
             "HasPart": [" has ", " does not have "]
             }
 
-### Generate questions
-with open('calibration_sentences.csv', 'w', newline='') as csvfile:
+### Generate sentences
+with open('silver_sentences.csv', 'w', newline='') as csvfile:
     for i in data:
         for property in data[i]:
             true = (data[i][property] == "yes")
@@ -72,7 +72,7 @@ question_connector = {"IsA": ["Is", ""],
             }
 
 ### Generate Questions and Answers
-with open('calibration_questions.csv', 'w', newline='') as csvfile:
+with open('silver_questions.csv', 'w', newline='') as csvfile:
     for i in data:
         for property in data[i]:
             true = (data[i][property] == "yes")
