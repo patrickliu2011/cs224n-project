@@ -1,0 +1,11 @@
+name: squad_env
+channels:
+  - defaults
+dependencies:
+  - python=3.6
+  - cython
+  - spacy
+  - pip
+  - pip:
+      - tensorflow
+      - benepar

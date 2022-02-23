@@ -83,7 +83,7 @@ with open('calibration_questions.csv', 'w', newline='') as csvfile:
 
             answer = "Yes" if true else "No"
             question = question_connector[category][0] + subjectArticle + i + question_connector[category][1] + \
-                (objectArticle if category in ["IsA"] else "") + recipient + "? " + answer
+                (objectArticle if category in ["IsA"] else "") + recipient + "?" + "|" + answer
 
             print(question)
             writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
