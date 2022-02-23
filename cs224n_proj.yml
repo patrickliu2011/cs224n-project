@@ -1,0 +1,22 @@
+name: cs224n_proj
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.8
+  - pytorch
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - tqdm
+  - docopt
+  - nltk
+  - torchvision
+  - pip
+  - tensorflow
+  - pip:
+      - sentencepiece
+      - sacrebleu
+      - tensorboard
+      - transformers
