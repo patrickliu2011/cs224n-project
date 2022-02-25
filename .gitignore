@@ -2,5 +2,6 @@
 */.ipynb_checkpoints
 qa_consistency/.DS_Store
 */__pycache__
+__pycache__
 noninteractive-gpu.sh
 sc-logs
