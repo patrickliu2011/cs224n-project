@@ -1,0 +1,20 @@
+cat
+chicken
+cockerel
+daisy
+eagle
+hippopotamus
+ladybug
+mammal
+oak
+oryx
+peacock
+pine
+porcupine
+sparrow
+sparrow hawk
+squirrel
+tulip
+turtle
+vertebrate
+wren
