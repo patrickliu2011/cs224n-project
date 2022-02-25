@@ -55,7 +55,7 @@ def correction_2(predictions, confidences, nli_matrix, return_flip_mask=False):
     return corrected
 
 def correction_3(predictions, confidences, nli_matrix, return_flip_mask=False):
-    """Flip everything with >0.5 contradiction probability compared to most in batch"""
+    """Flip everything with >0.5 contradiction probability compared to most confident in batch"""
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
@@ -65,6 +65,39 @@ def correction_3(predictions, confidences, nli_matrix, return_flip_mask=False):
     # Contradiction probability with most confident prediction in each batch
     contra_conf = np.take_along_axis(contra_matrix, most_confident, axis=1).reshape((N, B))
     flip = (contra_conf > 0.5)
+    
+    corrected = predictions.copy()
+    corrected[flip] = np.logical_not(corrected[flip])
+    if return_flip_mask:
+        return corrected, np.zeros_like(flip)
+    return corrected
+
+def correction_4(predictions, confidences, nli_matrix, return_flip_mask=False):
+    """Flip everything with >0.3 contradiction probability compared to most confident in batch"""
+    N, B = predictions.shape
+    contra_matrix = nli_matrix[:, :, :, 2]
+    contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
+    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    most_confident = np.argmax(confidences, axis=1).reshape((N, 1))
+    most_confident = np.repeat(most_confident, B, axis=1).reshape((N, 1, B))
+    # Contradiction probability with most confident prediction in each batch
+    contra_conf = np.take_along_axis(contra_matrix, most_confident, axis=1).reshape((N, B))
+    flip = (contra_conf > 0.3)
+    
+    corrected = predictions.copy()
+    corrected[flip] = np.logical_not(corrected[flip])
+    if return_flip_mask:
+        return corrected, np.zeros_like(flip)
+    return corrected
+
+def correction_5(predictions, confidences, nli_matrix, return_flip_mask=False):
+    """Generate contradictions as where contradiction is highest NLI probability, zero out the rest,
+    then flip anywhere contradictory"""
+    N, B = predictions.shape
+    contra_matrix = 1 * (np.argmax(nli_matrix, axis=3) == 2)
+    contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
+    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    flip = np.any(contra_matrix > 0, dim=2)
     
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
