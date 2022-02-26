@@ -13,6 +13,7 @@ from nltk.corpus import cmudict  # >>> nltk.download('cmudict')
 from nltk.tokenize import word_tokenize
 from spellchecker import SpellChecker
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification
 
@@ -31,8 +32,10 @@ parser.add_argument('--max_bsize_qa', required=False, type=int, default=20, \
                    help="Maximum forward pass batch size for the QA model. Defaults to 20")
 parser.add_argument('--max_bsize_nli', required=False, type=int, default=20, \
                    help="Maximum forward pass batch size for the NLI model. Defaults to 20")
-parser.add_argument('--correction_fn', required=False, type=str, nargs='+', default=["do_nothing"], \
-                   help="Function(s) from correction_utils. Defaults to \"do_nothing\"")
+parser.add_argument('--print_every', required=False, type=int, default=50, \
+                    help='Number of batches per print. Defaults to 50')
+parser.add_argument('--correction_fn', required=False, type=str, nargs='+', default=["C_0"], \
+                   help="Function(s) from correction_utils. Defaults to \"C_0\" (do nothing)")
 
 parser.add_argument('--constraints_path', required=False, type=str, default="beliefbank_data/constraints_v2.json", \
                    help="Path to constraints json file. Defaults to \"beliefbank_data/constraints_v2.json\"")
@@ -304,11 +307,11 @@ start = time.time()
 correction_fn_names = args.correction_fn
 correction_fns = [getattr(correction_utils, fn_name) for fn_name in correction_fn_names]
 
-acc_count = [0] * len(correction_fns)
-con_count = [0] * len(correction_fns)
-total_count = [0] * len(correction_fns)
-num_batches = [0] * len(correction_fns)
-flip_count = [0] * len(correction_fns)
+acc_count = np.array([0] * len(correction_fns))
+con_count = np.array([0] * len(correction_fns))
+total_count = np.array([0] * len(correction_fns))
+num_batches = np.array([0] * len(correction_fns))
+flip_count = np.array([0] * len(correction_fns))
 
 N = args.big_bsize # Number of entities to sample in a big batch
 batch_counter = 0
@@ -391,7 +394,7 @@ while num_batches[0] < args.num_batches:
         num_batches[i] += bsize # bsize should be equal to N
     # print(acc, con, total, bsize)
     
-    if num_batches[0] % 50 == 0:
+    if num_batches[0] % args.print_every == 0:
         num_pairs = num_batches[0] * B * B
         print(f"Iter {idx_count}: {num_batches[0]} batches, {total_count[0]} facts")
         for i, fn_name in enumerate(correction_fn_names):
@@ -411,3 +414,42 @@ for i, fn_name in enumerate(correction_fn_names):
 
 end = time.time()
 print("Runtime:", end - start)
+
+"""Generate and save figures"""
+
+print("Generating figures...")
+now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+print("Time is", now)
+
+correction_fn_aliases = correction_fn_names
+accuracies = acc_count / total_count * 100
+fig, ax = plt.subplots()
+ax.bar(correction_fn_aliases, accuracies)
+for i, v in enumerate(accuracies):
+    ax.text(i, v + 1 + max(accuracies) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
+ax.set_ylim(0, 100)
+ax.set_xlabel("Correction method")
+ax.set_ylabel("Percent accuracy")
+fig.savefig(f"figures/accuracy_{now}.png")
+
+fig, ax = plt.subplots()
+contra_rates = con_count / (num_batches * B * (B - 1) / 2) * 100
+plt.bar(correction_fn_aliases, contra_rates)
+for i, v in enumerate(contra_rates):
+    ax.text(i, v + 1 + max(contra_rates) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
+ax.set_ylim(0, min(max(contra_rates) + 5, 100))
+ax.set_xlabel("Correction method")
+ax.set_ylabel("Percent contradictory pairs")
+fig.savefig(f"figures/contradict_{now}.png")  
+
+fig, ax = plt.subplots()
+flip_rates = (flip_count / total_count) * 100
+plt.bar(correction_fn_aliases, flip_rates)
+for i, v in enumerate(flip_rates):
+    ax.text(i, v + 1 + max(accuracies) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
+ax.set_ylim(0, min(max(flip_rates) + 10, 100))
+ax.set_xlabel("Correction method")
+ax.set_ylabel("Percent flipped predictions")
+fig.savefig(f"figures/flipped_{now}.png")
+
+print("Figures saved!")
