@@ -31,8 +31,8 @@ parser.add_argument('--max_bsize_qa', required=False, type=int, default=20, \
                    help="Maximum forward pass batch size for the QA model. Defaults to 20")
 parser.add_argument('--max_bsize_nli', required=False, type=int, default=20, \
                    help="Maximum forward pass batch size for the NLI model. Defaults to 20")
-parser.add_argument('--correction_fn', required=False, type=str, default="do_nothing", \
-                   help="Function from correction_utils. Defaults to \"do_nothing\"")
+parser.add_argument('--correction_fn', required=False, type=str, nargs='+', default=["do_nothing"], \
+                   help="Function(s) from correction_utils. Defaults to \"do_nothing\"")
 
 parser.add_argument('--constraints_path', required=False, type=str, default="beliefbank_data/constraints_v2.json", \
                    help="Path to constraints json file. Defaults to \"beliefbank_data/constraints_v2.json\"")
@@ -301,13 +301,14 @@ print("Beginning experiment...")
 
 start = time.time()
 
-correction_fn = getattr(correction_utils, args.correction_fn)
+correction_fn_names = args.correction_fn
+correction_fns = [getattr(correction_utils, fn_name) for fn_name in correction_fn_names]
 
-acc_count = 0
-con_count = 0
-total_count = 0
-num_batches = 0
-flip_count = 0
+acc_count = [0] * len(correction_fns)
+con_count = [0] * len(correction_fns)
+total_count = [0] * len(correction_fns)
+num_batches = [0] * len(correction_fns)
+flip_count = [0] * len(correction_fns)
 
 N = args.big_bsize # Number of entities to sample in a big batch
 batch_counter = 0
@@ -319,7 +320,7 @@ B = args.bsize # Number of facts for each entity
 random.shuffle(dev_entities)
 idx_count = 0
 idx = 0
-while num_batches < args.num_batches:
+while num_batches[0] < args.num_batches:
     if idx == len(dev_entities):
         random.shuffle(dev_entities)
         idx = 0
@@ -379,28 +380,34 @@ while num_batches < args.num_batches:
     
     predictions = predictions.reshape(N, B)
     confidences = confidences.reshape(N, B)
-    corrected, flip_mask = correction_fn(predictions, confidences, nli_matrix, return_flip_mask=True)
-    flip_count += np.count_nonzero(flip_mask)
-    acc, con, total, bsize = evaluate(corrected, answers, pred_batch)
-    acc_count += acc
-    con_count += con
-    total_count += total
-    num_batches += bsize # bsize should be equal to N
+    
+    for i, correction_fn in enumerate(correction_fns):
+        corrected, flip_mask = correction_fn(predictions.copy(), confidences.copy(), nli_matrix.copy(), return_flip_mask=True)
+        flip_count[i] += np.count_nonzero(flip_mask)
+        acc, con, total, bsize = evaluate(corrected, answers, pred_batch)
+        acc_count[i] += acc
+        con_count[i] += con
+        total_count[i] += total
+        num_batches[i] += bsize # bsize should be equal to N
     # print(acc, con, total, bsize)
     
-    if num_batches % 50 == 0:
-        num_pairs = num_batches * B * B
-        print(f"Iter {idx_count}: {num_batches} batches, {total_count} facts")
-        print(f"\tAccurate {acc_count} / {total_count} questions = {acc_count / total_count}")
-        print(f"\tContradictions {con_count} / {num_batches} batches = {con_count / num_batches}")
-        print(f"\tCorrections {flip_count} / {num_batches} batches = {flip_count / num_batches}")
+    if num_batches[0] % 50 == 0:
+        num_pairs = num_batches[0] * B * B
+        print(f"Iter {idx_count}: {num_batches[0]} batches, {total_count[0]} facts")
+        for i, fn_name in enumerate(correction_fn_names):
+            print(f"Correction function {fn_name}:")
+            print(f"\tAccurate {acc_count[i]} / {total_count[i]} = {acc_count[i] / total_count[i]}")
+            print(f"\tContradictions {con_count[i]} / {num_batches[i]} = {con_count[i] / num_batches[i]}")
+            print(f"\tCorrections {flip_count[i]} / {num_batches[i]} = {flip_count[i] / num_batches[i]}")
 
 print("\n==================== Final Results ====================")
-num_pairs = num_batches
-print(f"End on iter {idx_count}: {num_batches} {B}x{B} batches, {total_count} facts")
-print(f"Accurate {acc_count} / {total_count} questions = {acc_count / total_count}")
-print(f"Contradictions {con_count} / {num_batches} batches = {con_count / num_batches} contradictions per batch")
-print(f"Corrections {flip_count} / {num_batches} batches = {flip_count / num_batches} flips per batch")
+num_pairs = num_batches[0] * B * B
+print(f"End on iter {idx_count}: {num_batches[0]} {B}x{B} batches, {total_count[0]} facts")
+for i, fn_name in enumerate(correction_fn_names):
+    print(f"Correction function {fn_name}:")
+    print(f"\tAccurate {acc_count[i]} / {total_count[i]} questions = {acc_count[i] / total_count[i]}")
+    print(f"\tContradictions {con_count[i]} / {num_batches[i]} batches = {con_count[i] / num_batches[i]} contradictions per batch")
+    print(f"\tCorrections {flip_count[i]} / {num_batches[i]} batches = {flip_count[i] / num_batches[i]} flips per batch")
 
 end = time.time()
 print("Runtime:", end - start)

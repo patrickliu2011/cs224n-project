@@ -13,22 +13,21 @@ def correction_1(predictions, confidences, nli_matrix, return_flip_mask=False):
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
-    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     contra_conf = contra_matrix * np.expand_dims(confidences, axis=1) # P(j correct) * P(i contradicts j)
     contra_conf = np.sum(contra_conf, axis=2) / (B - 1) # Mean of non-diagonal elements
     flip = (contra_conf > 0.5 * confidences)
-
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
     return corrected
 
 def correction_2(predictions, confidences, nli_matrix, return_flip_mask=False):
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
-    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     contra_conf = (contra_matrix - 0.5) * np.expand_dims(confidences, axis=1) # (P(j correct) - 0.5) * P(i contradicts j)
     contra_conf = np.sum(contra_conf, axis=2) # Sum of all elements (including diagonal)
     flip = (contra_conf > 0)
@@ -36,14 +35,14 @@ def correction_2(predictions, confidences, nli_matrix, return_flip_mask=False):
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
     return corrected
 
 def correction_2(predictions, confidences, nli_matrix, return_flip_mask=False):
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
-    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     contra_conf = (contra_matrix - 0.5) * np.expand_dims(confidences, axis=1) # (P(j correct) - 0.5) * P(i contradicts j)
     contra_conf = np.sum(contra_conf, axis=2) # Sum of all elements (including diagonal)
     flip = (contra_conf > 0)
@@ -51,7 +50,7 @@ def correction_2(predictions, confidences, nli_matrix, return_flip_mask=False):
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
     return corrected
 
 def correction_3(predictions, confidences, nli_matrix, return_flip_mask=False):
@@ -59,7 +58,7 @@ def correction_3(predictions, confidences, nli_matrix, return_flip_mask=False):
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
-    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     most_confident = np.argmax(confidences, axis=1).reshape((N, 1))
     most_confident = np.repeat(most_confident, B, axis=1).reshape((N, 1, B))
     # Contradiction probability with most confident prediction in each batch
@@ -69,7 +68,7 @@ def correction_3(predictions, confidences, nli_matrix, return_flip_mask=False):
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
     return corrected
 
 def correction_4(predictions, confidences, nli_matrix, return_flip_mask=False):
@@ -77,7 +76,7 @@ def correction_4(predictions, confidences, nli_matrix, return_flip_mask=False):
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
-    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     most_confident = np.argmax(confidences, axis=1).reshape((N, 1))
     most_confident = np.repeat(most_confident, B, axis=1).reshape((N, 1, B))
     # Contradiction probability with most confident prediction in each batch
@@ -87,7 +86,7 @@ def correction_4(predictions, confidences, nli_matrix, return_flip_mask=False):
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
     return corrected
 
 def correction_5(predictions, confidences, nli_matrix, return_flip_mask=False):
@@ -96,11 +95,28 @@ def correction_5(predictions, confidences, nli_matrix, return_flip_mask=False):
     N, B = predictions.shape
     contra_matrix = 1 * (np.argmax(nli_matrix, axis=3) == 2)
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
-    contra_matrix[:, np.diag_indices(B)] = 0 # Set diagonals to 0
-    flip = np.any(contra_matrix > 0, dim=2)
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
+    flip = np.any(contra_matrix > 0, axis=2)
     
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
+    return corrected
+
+def correction_6(predictions, confidences, nli_matrix, return_flip_mask=False):
+    """Generate contradictions as where contradiction is highest NLI probability, zero out the rest,
+    then the lower probability prediction for each contradictory pair"""
+    N, B = predictions.shape
+    contra_matrix = 1 * (np.argmax(nli_matrix, axis=3) == 2)
+    contra_matrix = contra_matrix + contra_matrix.transpose((0, 2, 1)) / 2
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
+    comp = (confidences.reshape((N, B, 1)) - confidences.reshape((N, 1, B))) < 0
+    contra_lower = np.logical_and(comp, contra_matrix) # Contradictory positions ij where i has lower confidence
+    flip = np.any(contra_lower, axis=2) # Flip position i if ij contradict with i having lower confidence
+    
+    corrected = predictions.copy()
+    corrected[flip] = np.logical_not(corrected[flip])
+    if return_flip_mask:
+        return corrected, flip
     return corrected
