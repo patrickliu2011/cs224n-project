@@ -81,7 +81,7 @@ def C_5(predictions, confidences, nli_matrix, return_flip_mask=False):
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
     contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
-    contra_conf = (contra_matrix - 0.5) * np.expand_dims(confidences, axis=1) # (P(i contradicts j) - 0.5) * (P(j correct) - 0.5)
+    contra_conf = (contra_matrix - 0.5) * (np.expand_dims(confidences, axis=1) - 0.5) # (P(i contradicts j) - 0.5) * (P(j correct) - 0.5)
     contra_conf = np.sum(contra_conf, axis=2) # Sum of all elements (including diagonal)
     flip = (contra_conf > 0)
 
@@ -106,7 +106,7 @@ def C_6(predictions, confidences, nli_matrix, return_flip_mask=False):
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
-        return corrected, np.zeros_like(flip)
+        return corrected, flip
     return corrected
 
 def C_7(predictions, confidences, nli_matrix, return_flip_mask=False):

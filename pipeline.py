@@ -421,10 +421,16 @@ print("Generating figures...")
 now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 print("Time is", now)
 
-correction_fn_aliases = correction_fn_names
+df = pd.DataFrame(
+    np.stack([correction_fn_names, acc_count, con_count, conacc_count, flip_count, 
+              total_count, num_batches]).T,
+    columns = ['correction_fn', 'acc_count', 'con_count', 'conacc_count', 'flip_count', 'total_count', 'num_batches']
+)
+df.to_csv(f'results/{now}.csv', index=False)
+
 accuracies = acc_count / total_count * 100
 fig, ax = plt.subplots()
-ax.bar(correction_fn_aliases, accuracies)
+ax.bar(correction_fn_names, accuracies)
 for i, v in enumerate(accuracies):
     ax.text(i, v + 1 + max(accuracies) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
 ax.set_ylim(0, 100)
@@ -434,13 +440,23 @@ fig.savefig(f"figures/accuracy_{now}.png")
 
 fig, ax = plt.subplots()
 contra_rates = con_count / (num_batches * B * (B - 1) / 2) * 100
-plt.bar(correction_fn_aliases, contra_rates)
+plt.bar(correction_fn_names, contra_rates)
 for i, v in enumerate(contra_rates):
     ax.text(i, v + 1 + max(contra_rates) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
 ax.set_ylim(0, min(max(contra_rates) + 5, 100))
 ax.set_xlabel("Correction method")
 ax.set_ylabel("Percent contradictory pairs")
 fig.savefig(f"figures/contradict_{now}.png")  
+
+fig, ax = plt.subplots()
+conacc_rates = conacc_count / (num_batches * B * (B - 1) / 2) * 100
+plt.bar(correction_fn_names, conacc_rates)
+for i, v in enumerate(conacc_rates):
+    ax.text(i, v + 1 + max(accuracies) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
+ax.set_ylim(0, min(max(conacc_rates) + 10, 100))
+ax.set_xlabel("Correction method")
+ax.set_ylabel("Percent consistent accuracy")
+fig.savefig(f"figures/consistentaccuracy_{now}.png")
 
 fig, ax = plt.subplots()
 flip_rates = (flip_count / total_count) * 100
