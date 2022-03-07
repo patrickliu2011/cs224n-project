@@ -1,4 +1,52 @@
 import numpy as np
+from pysat.examples.rc2 import RC2
+from pysat.formula import WCNF
+
+
+# MaxSAT formulation and solution
+def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
+    wcnf = WCNF() # initialize CNF
+
+    N, B = predictions.shape
+    contra_matrix = nli_matrix[:, :, :, 2]
+    contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
+
+    for i, (pred_row, conf_row) in enumerate(zip(predictions, confidences)): # iterate thru rows
+        # j + i * B is the # assigned to constraint at index (i, j)
+        constraints = [([j + i * B + 1] if pred_row[j] == 1 else [-(j + i * B + 1)]) for j in range(B)]
+        # print (constraints, conf_row.tolist())
+        wcnf.extend(constraints, weights=conf_row.tolist())
+
+    contradiction_constraints = []
+    weights = []
+    for i, matr in enumerate(contra_matrix): # matr is BxB
+        for j in range(B):
+            for k in range(B):
+                if k > j:
+                    P = j + i * B + 1 if predictions[i][j] == 1 else -(j + i * B + 1)
+                    Q = k + i * B + 1 if predictions[i][k] == 1 else -(k + i * B + 1)
+                    contradiction_constraints.append([-P, -Q])      # P ∨ Q == ~ (~P ∧ ~Q)
+                    weights.append((matr[j][k] - 0.5) * (-10)) # linearly scale from (0,1) to + weight if p < 0.5 / - weight if p > 0.5
+    # print(contradiction_constraints, weights)
+    wcnf.extend(contradiction_constraints, weights=weights)
+
+    # print(wcnf.soft)
+
+    # solving the MaxSAT problem
+    with RC2(wcnf) as rc2:
+        rc2.compute() 
+        # print(rc2.cost, rc2.model) # cost + solution
+        corrected = np.array(rc2.model).reshape(N, B)
+        corrected = np.heaviside(corrected, 0).astype(int)
+        flip = np.logical_xor(corrected, predictions)
+
+        # print(corrected)
+        # print(predictions)
+        # print(flip)
+
+    rc2.delete()
+
 
 # Correction methods
 # predictions: (N, B) bool
@@ -20,6 +68,8 @@ def C_1(predictions, confidences, nli_matrix, return_flip_mask=False):
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
     if return_flip_mask:
+        # print(corrected)
+        # print(flip)
         return corrected, flip
     return corrected
 
@@ -143,3 +193,20 @@ def C_8(predictions, confidences, nli_matrix, return_flip_mask=False):
     if return_flip_mask:
         return corrected, flip
     return corrected
+
+
+def test_case():
+    # N = 3, B = 4
+    predictions = np.array([[1,0,0,1],
+                            [0,1,1,0],
+                            [1,1,0,1]])
+    confidences = np.array([[1,1,1,1],
+                            [0,0,0,0],
+                            [1,1,1,1]])
+    nli_matrix = np.random.uniform(0, 1, size = (3,4,4,3))
+
+    MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=True)
+    C_1(predictions, confidences, nli_matrix, return_flip_mask=True)
+
+if __name__ == '__main__':
+    test_case()
