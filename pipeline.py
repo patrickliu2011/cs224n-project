@@ -7,6 +7,7 @@ import time
 import copy
 import torch
 import numpy as np
+import pandas as pd
 import nltk  # $ pip install nltk
 from nltk.stem import PorterStemmer
 from nltk.corpus import cmudict  # >>> nltk.download('cmudict')
@@ -283,10 +284,12 @@ def evaluate(predictions, answers, pred_batch):
     # predictions, answers, relations hould be size (N, B)
     
     # Calculate accurate examples
-    acc = np.sum(predictions == answers)
+    correct = (predictions == answers)
+    acc = np.sum(correct)
     
     # Calculate contradictions
     con = 0
+    conacc = 0
     for i in range(N):
         for j in range(B):
             for k in range(j+1, B):
@@ -294,10 +297,12 @@ def evaluate(predictions, answers, pred_batch):
                     relations[i, j], predictions[i, j], relations[i, k], predictions[i, k])
                 if contra:
                     con += 1
+                else:
+                    conacc += (correct[i, j] and correct[i, k])
     
     total = predictions.size
     bsize = predictions.shape[0]
-    return acc, con, total, bsize
+    return acc, con, conacc, total, bsize
 
 # Run experiment
 print("Beginning experiment...")
@@ -307,11 +312,12 @@ start = time.time()
 correction_fn_names = args.correction_fn
 correction_fns = [getattr(correction_utils, fn_name) for fn_name in correction_fn_names]
 
-acc_count = np.array([0] * len(correction_fns))
-con_count = np.array([0] * len(correction_fns))
-total_count = np.array([0] * len(correction_fns))
-num_batches = np.array([0] * len(correction_fns))
-flip_count = np.array([0] * len(correction_fns))
+acc_count = np.array([0] * len(correction_fns))    # Accurate answers
+con_count = np.array([0] * len(correction_fns))    # Contradictory pairs
+conacc_count = np.array([0] * len(correction_fns)) # Consistent and accurate pairs
+total_count = np.array([0] * len(correction_fns))  # Number of questions answered
+num_batches = np.array([0] * len(correction_fns))  # Number of batches run
+flip_count = np.array([0] * len(correction_fns))   # Number of corrections made
 
 N = args.big_bsize # Number of entities to sample in a big batch
 batch_counter = 0
@@ -387,12 +393,12 @@ while num_batches[0] < args.num_batches:
     for i, correction_fn in enumerate(correction_fns):
         corrected, flip_mask = correction_fn(predictions.copy(), confidences.copy(), nli_matrix.copy(), return_flip_mask=True)
         flip_count[i] += np.count_nonzero(flip_mask)
-        acc, con, total, bsize = evaluate(corrected, answers, pred_batch)
+        acc, con, conacc, total, bsize = evaluate(corrected, answers, pred_batch)
         acc_count[i] += acc
         con_count[i] += con
+        conacc_count[i] += conacc
         total_count[i] += total
         num_batches[i] += bsize # bsize should be equal to N
-    # print(acc, con, total, bsize)
     
     if num_batches[0] % args.print_every == 0:
         num_pairs = num_batches[0] * B * B
@@ -401,6 +407,7 @@ while num_batches[0] < args.num_batches:
             print(f"Correction function {fn_name}:")
             print(f"\tAccurate {acc_count[i]} / {total_count[i]} = {acc_count[i] / total_count[i]}")
             print(f"\tContradictions {con_count[i]} / {num_batches[i]} = {con_count[i] / num_batches[i]}")
+            print(f"\tConsistent+Accurate {conacc_count[i]} / {num_batches[i]} = {conacc_count[i] / num_batches[i]}")
             print(f"\tCorrections {flip_count[i]} / {num_batches[i]} = {flip_count[i] / num_batches[i]}")
 
 print("\n==================== Final Results ====================")
@@ -410,6 +417,7 @@ for i, fn_name in enumerate(correction_fn_names):
     print(f"Correction function {fn_name}:")
     print(f"\tAccurate {acc_count[i]} / {total_count[i]} questions = {acc_count[i] / total_count[i]}")
     print(f"\tContradictions {con_count[i]} / {num_batches[i]} batches = {con_count[i] / num_batches[i]} contradictions per batch")
+    print(f"\tConsistent+Accurate {conacc_count[i]} / {num_batches[i]} = {conacc_count[i] / num_batches[i]} consistent+accurate pairs per batch")
     print(f"\tCorrections {flip_count[i]} / {num_batches[i]} batches = {flip_count[i] / num_batches[i]} flips per batch")
 
 end = time.time()
@@ -428,8 +436,9 @@ df = pd.DataFrame(
 )
 df.to_csv(f'results/{now}.csv', index=False)
 
+figsize = (5,5)
 accuracies = acc_count / total_count * 100
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=figsize)
 ax.bar(correction_fn_names, accuracies)
 for i, v in enumerate(accuracies):
     ax.text(i, v + 1 + max(accuracies) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
@@ -438,7 +447,7 @@ ax.set_xlabel("Correction method")
 ax.set_ylabel("Percent accuracy")
 fig.savefig(f"figures/accuracy_{now}.png")
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=figsize)
 contra_rates = con_count / (num_batches * B * (B - 1) / 2) * 100
 plt.bar(correction_fn_names, contra_rates)
 for i, v in enumerate(contra_rates):
@@ -448,7 +457,7 @@ ax.set_xlabel("Correction method")
 ax.set_ylabel("Percent contradictory pairs")
 fig.savefig(f"figures/contradict_{now}.png")  
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=figsize)
 conacc_rates = conacc_count / (num_batches * B * (B - 1) / 2) * 100
 plt.bar(correction_fn_names, conacc_rates)
 for i, v in enumerate(conacc_rates):
@@ -458,9 +467,9 @@ ax.set_xlabel("Correction method")
 ax.set_ylabel("Percent consistent accuracy")
 fig.savefig(f"figures/consistentaccuracy_{now}.png")
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=figsize)
 flip_rates = (flip_count / total_count) * 100
-plt.bar(correction_fn_aliases, flip_rates)
+plt.bar(correction_fn_names, flip_rates)
 for i, v in enumerate(flip_rates):
     ax.text(i, v + 1 + max(accuracies) // 25, str(round(v, 1)), color="#0967a2", fontweight='semibold', ha='center', va='center')
 ax.set_ylim(0, min(max(flip_rates) + 10, 100))
