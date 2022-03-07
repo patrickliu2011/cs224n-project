@@ -32,8 +32,8 @@ def C_2(predictions, confidences, nli_matrix, return_flip_mask=False):
     contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     Pi = confidences.reshape((N, B, 1))
     Pj = confidences.reshape((N, 1, B))
-    P_notij = ((1 - Pi)*Pj / ((1 - Pi)*Pj + Pi*(1 - Pj))) * contra_matrix
-    P_notinotj = ((1 - Pi)*(1 - Pj) / ((1 - Pi)*(1 - Pj) + Pi*Pj)) * (1 - contra_matrix)
+    P_notij = ((1 - Pi)*Pj / ((1 - Pi)*Pj + Pi*(1 - Pj) + 1e-8)) * contra_matrix
+    P_notinotj = ((1 - Pi)*(1 - Pj) / ((1 - Pi)*(1 - Pj) + Pi*Pj + 1e-8)) * (1 - contra_matrix)
     P_noti = P_notij + P_notinotj
     P_noti = np.sum(P_noti, axis=2) / (B - 1)
     flip = (P_noti > 0.5)
