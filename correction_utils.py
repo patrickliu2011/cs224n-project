@@ -1,6 +1,6 @@
 import numpy as np
-from pysat.examples.rc2 import RC2
-from pysat.formula import WCNF
+from pysat.examples.rc2 import RC2 # RC2 MaxSat solver https://alexeyignatiev.github.io/assets/pdf/imms-jsat19-preprint.pdf
+from pysat.formula import WCNF # for installation, see: https://pysathq.github.io/installation.html (pip install python-sat)
 
 
 # MaxSAT formulation and solution
@@ -44,9 +44,11 @@ def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
         # print(corrected)
         # print(predictions)
         # print(flip)
-
     rc2.delete()
-
+    
+    if return_flip_mask:
+        return corrected, flip
+    return corrected
 
 # Correction methods
 # predictions: (N, B) bool
