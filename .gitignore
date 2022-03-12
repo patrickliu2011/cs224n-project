@@ -5,3 +5,6 @@ qa_consistency/.DS_Store
 __pycache__
 noninteractive-gpu.sh
 sc-logs
+.amlignore
+.amlignore.amltmp
+.gitignore

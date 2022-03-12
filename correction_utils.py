@@ -3,16 +3,15 @@ from pysat.examples.rc2 import RC2 # RC2 MaxSat solver https://alexeyignatiev.gi
 from pysat.formula import WCNF # for installation, see: https://pysathq.github.io/installation.html (pip install python-sat)
 
 
-# MaxSAT formulation and solution
+### MaxSAT formulation and solution
 def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
+    print("MAXSAT Run")
     N, B = predictions.shape
     contra_matrix = nli_matrix[:, :, :, 2]
     contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
     contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     corrected = np.array([])
     flip = np.array([])
-
-    # TODO: Ensure weight 0 soft constraint is not added, so it's not treated as a hard constraint. 
 
     for i in range(N): # each batch individually has its own SAT
         wcnf = WCNF()
@@ -29,17 +28,20 @@ def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
         for j in range(B):
             for k in range(B):
                 if k > j:
-                    P = j + 1 if predictions[i][j] == 1 else -(j + 1)
-                    Q = k + 1 if predictions[i][k] == 1 else -(k + 1)
-                    contradiction_constraints.append([-P, -Q])      # P ∨ Q == ~ (~P ∧ ~Q)
-                    weights.append((contra_matrix[i][j][k] - 0.5) * (-10)) # linearly scale from (0,1) to + weight if p < 0.5 / - weight if p > 0.5
+                    if contra_matrix[i][j][k] != 0: # weight != 0
+
+                        P = j + 1 if predictions[i][j] == 1 else -(j + 1)
+                        Q = k + 1 if predictions[i][k] == 1 else -(k + 1)
+                        contradiction_constraints.append([-P, -Q])      # P ∨ Q == ~ (~P ∧ ~Q)
+                        # TODO: play with scaling factor below (current best is +2)
+                        weights.append((contra_matrix[i][j][k] - 0.5) * (5)) # linearly scale from (0,1) to - weight if p < 0.5 / + weight if p > 0.5
         # print(contradiction_constraints, weights)
         wcnf.extend(contradiction_constraints, weights=weights)
 
         # solving the MaxSAT problem
         rc2 = RC2(wcnf)
         rc2.compute() 
-        print("Time taken: " + str(rc2.oracle_time()))
+        # print("Time taken: " + str(rc2.oracle_time()))
         # print(rc2.cost, rc2.model) # cost + solution
 
         # print(rc2.cost, rc2.model) # cost + solution
@@ -64,7 +66,7 @@ def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
         return corrected, flip
     return corrected
 
-# Correction methods
+### Correction Methods
 # predictions: (N, B) bool
 # confidences: (N, B) float
 # nli_matrix: (N, B, B, 3) float, last dimension is [entailment, neutral, contradiction]
@@ -211,25 +213,32 @@ def C_8(predictions, confidences, nli_matrix, return_flip_mask=False):
     return corrected
 
 
-def test_case():
-    N = 1
-    B = 400
-    predictions = np.random.randint(0, 2, size= (N, B))
-    confidences = np.random.uniform(0, 1, size = (N, B))
-    nli_matrix = np.random.uniform(0, 1, size = (N, B, B, 3))
+### Re-querying NLI/QA models
+# If A and B contradict, and you decide to flip B, then you have the same batch but with ~B
+# Get the NLI with ~B (not entire matrix, just corresponding row/col -- compare ~B with the rest of batch)
+# Then, if it contradicts with anything else in the batch, repeat
 
 
-    # N = 3, B = 4
-    # predictions = np.array([[1,0,0,1],
-    #                         [0,1,1,0],
-    #                         [1,1,0,1]])
-    # confidences = np.array([[1,1,1,1],
-    #                         [0,0,0,0],
-    #                         [1,1,1,1]])
-    # nli_matrix = np.random.uniform(0, 1, size = (3,4,4,3))
 
-    MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=True)
-    C_1(predictions, confidences, nli_matrix, return_flip_mask=True)
+# def test_case():
+#     # N = 1
+#     # B = 400
+#     # predictions = np.random.randint(0, 2, size= (N, B))
+#     # confidences = np.random.uniform(0, 1, size = (N, B))
+#     # nli_matrix = np.random.uniform(0, 1, size = (N, B, B, 3))
 
-if __name__ == '__main__':
-    test_case()
+
+#     # N = 3 B = 4
+#     predictions = np.array([[1,0,0,1],
+#                             [0,1,1,0],
+#                             [1,1,0,1]])
+#     confidences = np.array([[1,1,1,1],
+#                             [0,0,0,0],
+#                             [1,1,1,1]])
+#     nli_matrix = np.random.uniform(0, 1, size = (3,4,4,3))
+
+#     MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=True)
+#     C_1(predictions, confidences, nli_matrix, return_flip_mask=True)
+
+# if __name__ == '__main__':
+#     test_case()
