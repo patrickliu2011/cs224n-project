@@ -60,6 +60,18 @@ def generate_question(entity, relation, true):
 
     return question, answer
 
+def generate_inverse_question(entity, relation, true):
+    category, recipient = relation.split(",")
+    
+    subjectArticle = " an " if starts_with_vowel_sound(entity) else " a "
+    objectArticle = " an " if starts_with_vowel_sound(recipient) else " a "
+
+    answer = "Yes" if true else "No"
+    question = question_connector[category][0] + subjectArticle + entity + question_connector[category][1] + " not" + \
+        (objectArticle if category in ["IsA"] else "") + recipient + "?" # + "|" + answer
+
+    return question, answer
+
 # TODO: add depth for deeper iteration of constraints tree
 def find_constraints(constraints, filter_dict={}, max_constraints=None):
     def filter_fn(link):

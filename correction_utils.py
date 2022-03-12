@@ -2,7 +2,6 @@ import numpy as np
 from pysat.examples.rc2 import RC2 # RC2 MaxSat solver https://alexeyignatiev.github.io/assets/pdf/imms-jsat19-preprint.pdf
 from pysat.formula import WCNF # for installation, see: https://pysathq.github.io/installation.html (pip install python-sat)
 
-
 ### MaxSAT formulation and solution
 def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
     print("MAXSAT Run")
@@ -82,6 +81,7 @@ def C_1(predictions, confidences, nli_matrix, return_flip_mask=False):
     contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
     contra_conf = contra_matrix * np.expand_dims(confidences, axis=1) # P(j correct) * P(i contradicts j)
     contra_conf = np.sum(contra_conf, axis=2) / (B - 1) # Mean of non-diagonal elements
+    # (N, B) -- 1 val for each statement
     flip = (contra_conf > 0.5 * confidences)
     corrected = predictions.copy()
     corrected[flip] = np.logical_not(corrected[flip])
@@ -213,10 +213,6 @@ def C_8(predictions, confidences, nli_matrix, return_flip_mask=False):
     return corrected
 
 
-### Re-querying NLI/QA models
-# If A and B contradict, and you decide to flip B, then you have the same batch but with ~B
-# Get the NLI with ~B (not entire matrix, just corresponding row/col -- compare ~B with the rest of batch)
-# Then, if it contradicts with anything else in the batch, repeat
 
 
 
