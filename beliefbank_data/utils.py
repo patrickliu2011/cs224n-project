@@ -60,6 +60,11 @@ def generate_question(entity, relation, true):
 
     return question, answer
 
+def generate_question_with_context(context, statement):
+    entity1, relation1, true1 = context
+    entity2, relation2, true2 = statement
+    return generate_assertion(entity1, relation1, true1) + " " + generate_question(entity2, relation2, true2)
+
 def generate_inverse_question(entity, relation, true):
     category, recipient = relation.split(",")
     
