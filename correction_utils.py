@@ -1,3 +1,4 @@
+from xmlrpc.client import FastMarshaller
 import numpy as np
 from pysat.examples.rc2 import RC2 # RC2 MaxSat solver https://alexeyignatiev.github.io/assets/pdf/imms-jsat19-preprint.pdf
 from pysat.formula import WCNF # for installation, see: https://pysathq.github.io/installation.html (pip install python-sat)
@@ -59,7 +60,6 @@ def MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=False):
     print(corrected)
     print(predictions)
     print(flip)
-
 
     if return_flip_mask:
         return corrected, flip
@@ -216,7 +216,6 @@ def C_9(predictions, confidences, nli_matrix, return_flip_mask = False):
     """
     Entailment-based approach. Start with C_1.
     Then if statement B is flipped and A→B has a high entailment, then flip A.
-    Assuming nli_matrix[N, A_idx, B_idx, 0] contains A→B entailment score 
     """
     entailment_threshold = 0.5
     flip_threshold = 0.75 # this threshold must be > 0.5
@@ -236,6 +235,40 @@ def C_9(predictions, confidences, nli_matrix, return_flip_mask = False):
             confidences[N_idx, A_idx] = 1 - confidences[N_idx, A_idx]
             corrected_preds[N_idx, A_idx] = np.logical_not(corrected_preds[N_idx, A_idx])
     return corrected_preds, flip
+
+def C_10(predictions, confidences, nli_matrix, delta = 0.2, return_flip_mask = False): # delta = 0.0 is equivalent to running vanilla C_1
+
+    '''
+    Use entailment scores to augment contradiction scores. If entailment score of (A entails ~B) > threshold, 
+    and A true but B false, decrease A's confidence.
+
+    (Prob not theoretically sound)
+    '''
+    N, B = predictions.shape
+    entailment_threshold = 0.5
+
+    entailment_matrix = nli_matrix[:, :, :, 0] # N x B x B
+    contra_matrix = nli_matrix[:, :, :, 2]
+    contra_matrix = (contra_matrix + contra_matrix.transpose((0, 2, 1))) / 2
+    contra_matrix[:, range(B), range(B)] = 0 # Set diagonals to 0
+
+    N_idxs, A_idxs, B_idxs = np.where(entailment_matrix > entailment_threshold)
+
+    for N_idx, A_idx, B_idx in zip(N_idxs, A_idxs, B_idxs):
+        # Prediction: A true, B false. P(A true entails B false) > 0.5. So decrease A conf.
+
+        if(predictions[N_idx, A_idx] and not predictions[N_idx, B_idx]): # A true, B false
+            confidences[N_idx, A_idx] -= delta # decrease A conf
+        # if(not predictions[N_idx, A_idx] and predictions[N_idx, B_idx]): # A false, B true
+        #     confidences[N_idx, A_idx] += delta # increase A conf
+        # Below does NOT work:
+        # if(predictions[N_idx, A_idx] and predictions[N_idx, B_idx]): 
+        #     confidences[N_idx, A_idx] -= delta
+
+    # Now apply existing correction func
+    return C_1(predictions, confidences, nli_matrix, return_flip_mask=return_flip_mask)
+
+
 
 
 def test_multiply():
