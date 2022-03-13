@@ -1,0 +1,3 @@
+correction_fn,accurate,TP,TN,FN,FP,contradictory_pairs,consistent_acc_pairs,relevant_pairs,total_questions,num_batches,flips
+C_0,82,10,72,1,17,21,299,171,100,10,0
+C_1,92,10,82,1,7,4,378,102,100,10,10
