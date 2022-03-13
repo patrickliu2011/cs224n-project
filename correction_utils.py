@@ -219,6 +219,7 @@ def C_9(predictions, confidences, nli_matrix, return_flip_mask = False):
     Assuming nli_matrix[N, A_idx, B_idx, 0] contains A→B entailment score 
     """
     entailment_threshold = 0.5
+    flip_threshold = 0.75 # this threshold must be > 0.5
 
     N, B = predictions.shape
     entailment_matrix = nli_matrix[:, :, :, 0] # N x B x B
@@ -226,10 +227,14 @@ def C_9(predictions, confidences, nli_matrix, return_flip_mask = False):
     corrected_preds, flip = C_1(predictions, confidences, nli_matrix, return_flip_mask = True) # flip: N x B
 
     # print(flip * entailment_matrix)
-    # statements_to_check = np.where((flip * entailment_matrix) > entailment_threshold))) # statements where A->B has high entailment, (N, A_idx, B_idx)
+    flip = np.expand_dims(flip, axis = 1)
+    N_idxs, A_idxs, B_idxs = np.where((flip * entailment_matrix) > entailment_threshold) # indices of statements where B is flipped and A->B has high entailment
     
-
-
+    # Flip statement A if p < some threshold
+    for N_idx, A_idx in zip(N_idxs, A_idxs):
+        if(confidences[N_idx, A_idx] < flip_threshold):
+            confidences[N_idx, A_idx] = 1 - confidences[N_idx, A_idx]
+            corrected_preds[N_idx, A_idx] = np.logical_not(corrected_preds[N_idx, A_idx])
     return corrected_preds, flip
 
 
@@ -240,9 +245,25 @@ def test_multiply():
                      [0, 1, 1]])
     flip = np.expand_dims(flip, axis = 1)
     entailment_matrix = np.random.uniform(0, 1, size = (N, B, B))
-    print(flip, entailment_matrix)
+    test = np.nonzero(entailment_matrix > 0.9)
+    N_idxs, A_idxs, B_idxs = test
 
-    print(flip * entailment_matrix)
+    confidences = np.random.uniform(0, 1, size = (N, B))
+    predictions = np.random.randint(0, 2, size= (N, B))
+
+    # Flip statement A if p < some threshold
+    print(confidences, predictions)
+    print("Running flip")
+    for N_idx, A_idx in zip(N_idxs, A_idxs):
+        if(confidences[N_idx, A_idx] < 0.5):
+            confidences[N_idx, A_idx] = 1 - confidences[N_idx, A_idx]
+            predictions[N_idx, A_idx] = np.logical_not(predictions[N_idx, A_idx])
+    print(confidences, predictions)
+    # print(test)
+    # print(entailment_matrix[N_idx, A_idx, B_idx])    
+    # print(flip, entailment_matrix)
+
+    # print(flip * entailment_matrix)
 
 # def test_case():
 #     # N = 1
