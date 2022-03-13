@@ -22,7 +22,7 @@ connector = {
 
 def generate_assertion(entity, relation, true):
     category, recipient = relation.split(",")
-    print(entity, relation, true)
+    # print(entity, relation, true)
     if (category == "IsA"):
         subjectArticle = "An " if starts_with_vowel_sound(entity) else "A "
         objectArticle = "an " if starts_with_vowel_sound(recipient) else "a "

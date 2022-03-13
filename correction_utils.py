@@ -212,9 +212,37 @@ def C_8(predictions, confidences, nli_matrix, return_flip_mask=False):
         return corrected, flip
     return corrected
 
+def C_9(predictions, confidences, nli_matrix, return_flip_mask = False):
+    """
+    Entailment-based approach. Start with C_1.
+    Then if statement B is flipped and A→B has a high entailment, then flip A.
+    Assuming nli_matrix[N, A_idx, B_idx, 0] contains A→B entailment score 
+    """
+    entailment_threshold = 0.5
+
+    N, B = predictions.shape
+    entailment_matrix = nli_matrix[:, :, :, 0] # N x B x B
+
+    corrected_preds, flip = C_1(predictions, confidences, nli_matrix, return_flip_mask = True) # flip: N x B
+
+    # print(flip * entailment_matrix)
+    # statements_to_check = np.where((flip * entailment_matrix) > entailment_threshold))) # statements where A->B has high entailment, (N, A_idx, B_idx)
+    
 
 
+    return corrected_preds, flip
 
+
+def test_multiply():
+    N = 2
+    B = 3
+    flip = np.array([[1, 0, 0],
+                     [0, 1, 1]])
+    flip = np.expand_dims(flip, axis = 1)
+    entailment_matrix = np.random.uniform(0, 1, size = (N, B, B))
+    print(flip, entailment_matrix)
+
+    print(flip * entailment_matrix)
 
 # def test_case():
 #     # N = 1
@@ -236,5 +264,6 @@ def C_8(predictions, confidences, nli_matrix, return_flip_mask=False):
 #     MaxSAT(predictions, confidences, nli_matrix, return_flip_mask=True)
 #     C_1(predictions, confidences, nli_matrix, return_flip_mask=True)
 
-# if __name__ == '__main__':
-#     test_case()
+if __name__ == '__main__':
+    # test_case()
+    test_multiply()
