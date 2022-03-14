@@ -268,8 +268,14 @@ def C_10(predictions, confidences, nli_matrix, delta = 0.2, return_flip_mask = F
     # Now apply existing correction func
     return C_1(predictions, confidences, nli_matrix, return_flip_mask=return_flip_mask)
 
-
-
+def C_11(predictions, confidences, nli_matrix, return_flip_mask = False):
+    '''
+    Use entailment scores & predictions to requery NLI and generate new entailment scores.
+    When prediction of (A true, B false), and A entails B (A->B), query NLI to generate new entailment score
+    of (A, not B) and/or (B, not A). 
+    If A entails not B (A-> ~B) is high, and B's conf is low, flip B.
+    '''
+    pass
 
 def test_multiply():
     N = 2
